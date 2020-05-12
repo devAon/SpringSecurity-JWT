@@ -27,7 +27,7 @@ public class LoginController {
     private JwtUtil jwtTokenUtil;
 
     @Autowired
-    private MyUserDetailsService myUserDetailsService;
+    private MyUserDetailsService userDetailsService;
 
 
     @GetMapping("/main")
@@ -48,7 +48,7 @@ public class LoginController {
             throw new Exception("Incorrect username or password", e);
         }
 
-        final UserDetails userDetails = myUserDetailsService
+        final UserDetails userDetails = userDetailsService
                 .loadUserByUsername(authenticationRequest.getUsername());
         final String jwt = jwtTokenUtil.generateToken(userDetails);
         return ResponseEntity.ok(new AuthenticationResponse(jwt));
