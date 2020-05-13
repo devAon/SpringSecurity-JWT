@@ -193,4 +193,18 @@ isTokenExpired
 createToken
 validateToken
 ```
+![image](https://user-images.githubusercontent.com/49062985/81705362-ede7d980-94a9-11ea-86fa-f04cce88dfb9.png)
 
+
+
+
+
+![image](https://user-images.githubusercontent.com/49062985/81712284-63a27400-94af-11ea-900c-0820e7c899dc.png)
+
+![image](https://user-images.githubusercontent.com/49062985/81712493-9ea4a780-94af-11ea-8f06-4c3ec96bd208.png)
+
+
+
+![image](https://user-images.githubusercontent.com/49062985/81712743-ef1c0500-94af-11ea-8040-e8e26937e53d.png)
+
+![image](https://user-images.githubusercontent.com/49062985/81717642-c3038280-94b5-11ea-8755-ac46ffca991e.png)
