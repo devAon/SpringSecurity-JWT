@@ -1,4 +1,4 @@
-# SpringSecurity-JWT
+# SpringSecurity-JWT 란 무엇인가?
 
 </br>
 
@@ -176,3 +176,21 @@ https://www.youtube.com/watch?v=x6bzYyMY0GA&list=PLVApX3evDwJ1d0lKKHssPQvzv2Ao3e
 [https://medium.com/sjk5766/jwt-json-web-token-%EC%86%8C%EA%B0%9C-49e211c65b45](https://medium.com/sjk5766/jwt-json-web-token-소개-49e211c65b45)
 
 https://sanghaklee.tistory.com/47
+
+
+
+#
+
+# SpringSecurity-JWT 구현
+### jwtUtil
+
+```
+extractUsername
+extractExpiration
+extractClaim
+extractAllClaims
+isTokenExpired
+createToken
+validateToken
+```
+
