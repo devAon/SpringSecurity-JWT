@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
  * Github : http://github.com/devAon
  */
 @RestController
+@CrossOrigin
 public class LoginController {
 
     @Autowired
