@@ -35,6 +35,11 @@ public class LoginController {
         return "Welcome!! This is main page";
     }
 
+    @GetMapping("/hello")
+    public String hello(){
+        return "hello";
+    }
+
     @PostMapping("/authenticate")
     public ResponseEntity<?> createAuthenticationToken(@RequestBody AuthenticationRequest authenticationRequest) throws Exception {
         try {
