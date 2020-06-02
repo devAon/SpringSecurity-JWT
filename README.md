@@ -2,7 +2,11 @@
 
 </br>
 
-👉👉👉 [[Spring Security] JWT(JSON Web Token) 의 모든 것 - 찰나의 개발흔적](https://aonee.tistory.com/70, "aonee 찰나의 개발흔적 티스토리 포스팅")
+👉👉👉 [[Spring Security] JWT(JSON Web Token) 의 모든 것 - 찰나의 개발흔적](https://aonee.tistory.com/70, "[Spring Security] JWT(JSON Web Token) 의 모든 것 - 찰나의 개발흔적")
+
+</br>
+
+👉👉👉 [[Spring Security] JWT(JSON Web Token) 의 코드 구현 - 찰나의 개발흔적](https://aonee.tistory.com/70, "[Spring Security] JWT(JSON Web Token) 의 코드 구현 - 찰나의 개발흔적")
 
 </br>
 
@@ -212,3 +216,327 @@ validateToken
 ![image](https://user-images.githubusercontent.com/49062985/81712743-ef1c0500-94af-11ea-8040-e8e26937e53d.png)
 
 ![image](https://user-images.githubusercontent.com/49062985/81717642-c3038280-94b5-11ea-8755-ac46ffca991e.png)
+
+
+
+
+# 1. 동작과정
+
+### Generating JWT
+
+![generate jwt](https://user-images.githubusercontent.com/49062985/82150947-de470700-9894-11ea-8ae1-473762d61e80.jpg)
+
+1. Client : 로그인 요청 POST (id, pw)
+2. Server : id, pw가 맞는지 확인 후 맞다면 JWT를 SecretKey로 생성
+3. Client : Server에게 받은 JWT를 로컬 or 세션에 저장
+4. Client : 서버에 요청할 때 항상 헤더에 Token을 포함시킴
+5. Server : 요청을 받을 때마다 SecretKey를 이용해 Token이 유효한지 검증
+   * 서버만이 SecretKey를 가지고 있기 때문에 검증 가능
+   * Token이 검증되면 따로 username, pw를 검사하지 않아도 사용자 인증 가능
+6. Server : response
+
+![AuthenticationManager](https://user-images.githubusercontent.com/49062985/82150976-0b93b500-9895-11ea-9ee8-ae2ea3196e8b.jpg)
+
+
+
+
+
+# 2. Token 유효 검증
+
+1. 클라이언트의 요청 (Header : Token)
+2. Spring의 Interceptor에 의해 요청이 Intercept됨
+3. 클라이언트에게 제공되었던 Token과 클라이언트의 Header에 담긴 Token 일치 확인
+4. `auth0 JWT`를 이용해 `issuer, expire` 검증
+
+### Validating JWT
+
+![validating jwt](https://user-images.githubusercontent.com/49062985/82150987-12bac300-9895-11ea-8430-a89e4d20a72d.jpg)
+
+
+
+
+
+
+
+# 3. Spring Boot Security + JWT 코드
+
+## 3-1. dependency 추가
+
+### pom.xml
+
+```xml
+<dependency>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-security</artifactId>
+</dependency>
+<dependency>
+<groupId>io.jsonwebtoken</groupId>
+<artifactId>jjwt</artifactId>
+<version>0.9.1</version>
+</dependency>
+```
+
+- `spring-boot-starter-security`와 `jjwt` 추가
+
+<br>
+
+<br>
+
+## 3-2. Secret Key 설정
+
+- Hashing algorithm과 함께 사용할 Secret Key를 설정
+- Secret Key는 Header, Payload와 결합되어 Hash 생성
+
+### application.properties
+
+```
+jwt.secret=aoneeJjangjwt
+```
+
+<br>
+
+<br>
+
+## 3. JwtUtil
+
+- JWT를 생성하고 검증하는 역할 수행
+- `io.jsonwebtoken.Jwts` 라이브러리 사용
+
+```
+@Component
+public class JwtUtil {
+    @Value("${jwt.secret}")
+    private String SECRET_KEY;
+
+    public String extractUsername(String token) {
+        return extractClaim(token, Claims::getSubject);
+    }
+
+    public Date extractExpiration(String token) {
+        return extractClaim(token, Claims::getExpiration);
+    }
+
+    public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
+        final Claims claims = extractAllClaims(token);
+        return claimsResolver.apply(claims);
+    }
+    private Claims extractAllClaims(String token) {
+        return Jwts.parser().setSigningKey(SECRET_KEY).parseClaimsJws(token).getBody();
+    }
+
+    private Boolean isTokenExpired(String token) {
+        return extractExpiration(token).before(new Date());
+    }
+
+    public String generateToken(UserDetails userDetails) {
+        Map<String, Object> claims = new HashMap<>();
+        return createToken(claims, userDetails.getUsername());
+    }
+
+    private String createToken(Map<String, Object> claims, String subject) {
+
+        return Jwts.builder().setClaims(claims).setSubject(subject).setIssuedAt(new Date(System.currentTimeMillis()))
+                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 10))
+                .signWith(SignatureAlgorithm.HS256, SECRET_KEY).compact();
+    }
+
+    public Boolean validateToken(String token, UserDetails userDetails) {
+        final String username = extractUsername(token);
+        return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
+    }
+}
+```
+
+### doGenerateToken
+
+- Token 생성
+  - **claim** : Token에 담을 정보
+  - **issuer** : Token 발급자
+  - **subject** : Token 제목
+  - **issuedate** : Token 발급 시간
+  - **expiration** : Token 만료 시간
+    - milliseconds 기준!
+    - `JWT_TOKEN_VALIDITY` = 5 * 60 * 60  => **5시간**
+- `signWith` (알고리즘, 비밀키)
+
+<br>
+
+<br>
+
+## 4. MyUserDetailsService
+
+- DB에서 UserDetail를 얻어와 AuthenticationManager에게 제공하는 역할
+- 이번에는 DB 없이 하드코딩된 User List에서 get userDetail
+
+```
+@Service
+public class MyUserDetailsService implements UserDetailsService {
+
+    @Override
+    public UserDetails loadUserByUsername(String s) throws UsernameNotFoundException {
+        return new User("aonee","$2a$10$VKu6eW.2pHLJn3yeW0eMxuEUBxXCq/b2Vo3HwSqROGI2mmYRnXqpm",new ArrayList<>());
+    }
+}
+```
+
+- Spring Security 5.0에서는 Password를 BryptEncoder를 통해 Brypt화한다.
+  - https://www.javainuse.com/onlineBcrypt 에서 user_pw를 Bcrypt화
+    - $2a$10$VKu6eW.2pHLJn3yeW0eMxuEUBxXCq/b2Vo3HwSqROGI2mmYRnXqpm
+- id : user_id, pw: user_pw로 고정해 사용자 확인
+- 사용자 확인 실패시 throw Exception
+
+<br>
+
+<br>
+
+## 5. LoginController
+
+- 사용자가 입력한 id, pw를 body에 넣어서 **POST** API mapping **/authenticate**
+- 사용자의 id, pw를 검증
+- **jwtUtil**을 호출해 Token을 생성하고  **JwtResponse**에 Token을 담아  return ResponseEntity
+
+```
+@RestController
+@CrossOrigin
+public class LoginController {
+
+    @Autowired
+    private AuthenticationManager authenticationManager;
+
+    @Autowired
+    private JwtUtil jwtTokenUtil;
+
+    @Autowired
+    private MyUserDetailsService userDetailsService;
+
+
+    @GetMapping("/main")
+    public String main(){
+        return "Welcome!! This is main page";
+    }
+
+    @GetMapping("/hello")
+    public String hello(){
+        return "hello";
+    }
+
+    @PostMapping("/authenticate")
+    public ResponseEntity<?> createAuthenticationToken(@RequestBody AuthenticationRequest authenticationRequest) throws Exception {
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            authenticationRequest.getUsername(),
+                            authenticationRequest.getPassword())
+            );
+
+        } catch (BadCredentialsException e) {
+            throw new Exception("Incorrect username or password", e);
+        }
+
+        final UserDetails userDetails = userDetailsService
+                .loadUserByUsername(authenticationRequest.getUsername());
+        final String jwt = jwtTokenUtil.generateToken(userDetails);
+        return ResponseEntity.ok(new AuthenticationResponse(jwt));
+    }
+
+}
+
+```
+
+<br>
+
+<br>
+
+## 6. AuthenticationRequest
+
+- 사용자에게서 받은 id, pw를 저장
+
+```
+@Getter
+@Setter
+public class AuthenticationRequest {
+    private String username;
+    private String password;
+
+    public AuthenticationRequest() {
+    }
+
+    public AuthenticationRequest(String username, String password) {
+        this.username = username;
+        this.password = password;
+    }
+}
+
+```
+
+<br>
+
+<br>
+
+## 7. AuthenticationResponse
+
+* 사용자에게 반환될 JWT를 담은 Response
+
+```
+@Getter
+public class AuthenticationResponse {
+    private final String jwt;
+
+    public AuthenticationResponse(String jwt) {
+        this.jwt = jwt;
+    }
+}
+
+```
+
+<br>
+
+<br>
+
+## 8. JwtRequestFilter
+
+- Client의 Request를 Intercept해서 Header의  Token가 유효한지 검증
+- if 유효한 Token
+  - Spring Security의 Authentication을 Setting, to specify that the current user is authenticated
+
+```
+@Component
+public class JwtRequestFilter extends OncePerRequestFilter {
+
+    @Autowired
+    private MyUserDetailsService userDetailsService;
+
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+            throws ServletException, IOException {
+        final String authorizationHeader = request.getHeader("Authorization");
+
+        String username= null;
+        String jwt = null;
+
+        if(authorizationHeader != null && authorizationHeader.startsWith("Bearer ")){
+            jwt = authorizationHeader.substring(7);
+            username = jwtUtil.extractUsername(jwt);
+        }
+
+        if(username != null && SecurityContextHolder.getContext().getAuthentication() == null){
+            UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
+
+            if(jwtUtil.validateToken(jwt, userDetails)){
+                UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken =
+                        new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                usernamePasswordAuthenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(usernamePasswordAuthenticationToken);
+            }
+        }
+        chain.doFilter(request,response);
+    }
+}
+
+```
+
+
+
